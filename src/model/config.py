@@ -14,7 +14,8 @@ class StableDiffusionConfig:
 
     # Data info
     img_channels = 3
-    img_size = 256
+    img_size = 512
+    vocab_size = 49408
 
     # VAE info
     vae_features_dims = [128, 256, 512]
@@ -22,6 +23,14 @@ class StableDiffusionConfig:
     vae_num_groups = 32
     vae_num_heads = 8
     vae_dropout = 0.2
+
+    # CLIP info
+    clip_emb_dim = 768
+    clip_seq_len = 77
+    clip_emb_dim_scale_factor = 4
+    clip_attn_num_heads = 12
+    clip_num_layers = 12
+    clip_dropout = 0.1
 
     # UNet info
     T = 2000
