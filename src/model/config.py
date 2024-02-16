@@ -19,7 +19,7 @@ class StableDiffusionConfig:
 
     # VAE info
     vae_features_dims = [128, 256, 512]
-    vae_latent_dim = 8
+    vae_latent_dim = 4
     vae_num_groups = 32
     vae_num_heads = 8
     vae_dropout = 0.2
@@ -33,6 +33,12 @@ class StableDiffusionConfig:
     clip_dropout = 0.1
 
     # UNet info
+    unet_time_emb_dim = 320
+    unet_time_emb_dim_scale_factor = 4
+    unet_features_dims = [320, 640, 1280]
+    unet_attn_num_heads = 8
+    unet_attn_dim = 40
+
     T = 2000
     d_model = 1024
 

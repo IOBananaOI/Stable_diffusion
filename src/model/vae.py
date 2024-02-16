@@ -87,19 +87,19 @@ class VAE_AttentionBlock(nn.Module):
 
         n, c, h, w = x.shape
         
-        # (batch_size, attn_dim, img_latent_size, img_latent_size) -> (batch_size, attn_dim, img_latent_size**2) 
+        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8**2) 
         x = x.view(n, c, h * w)
 
-        # (batch_size, attn_dim, img_latent_size**2) -> (batch_size, img_latent_size**2, attn_dim) 
+        # (batch_size, attn_dim, img_size // 8**2) -> (batch_size, img_size // 8**2, attn_dim) 
         x = x.transpose(-1, -2)
 
-        # (batch_size, img_latent_size**2, attn_dim) -> (batch_size, img_latent_size**2, attn_dim)
+        # (batch_size, img_size // 8**2, attn_dim) -> (batch_size, img_size // 8**2, attn_dim)
         x, _ = self.attn(x, x, x, need_weights=False)
 
-        # (batch_size, img_latent_size**2, attn_dim) -> (batch_size, attn_dim, img_latent_size**2)
+        # (batch_size, img_size // 8**2, attn_dim) -> (batch_size, attn_dim, img_size // 8**2)
         x = x.transpose(-1, -2)
 
-        # (batch_size, attn_dim, img_latent_size**2) -> (batch_size, attn_dim, img_latent_size, img_latent_size)
+        # (batch_size, attn_dim, img_size // 8**2) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
         x = x.view(n, c, h, w)
 
         x += resid
@@ -135,26 +135,25 @@ class VAE_Encoder(nn.Module):
         )
 
         self.latent_dim_proj_layer = nn.Sequential(
-            nn.Conv2d(attn_dim, vae_latent_dim, kernel_size=3, padding=1),
-            nn.Conv2d(vae_latent_dim, vae_latent_dim, kernel_size=1)
+            nn.Conv2d(attn_dim, vae_latent_dim * 2, kernel_size=3, padding=1),
+            nn.Conv2d(vae_latent_dim * 2, vae_latent_dim * 2, kernel_size=1)
         )
 
     def forward(self, x, noise : torch.Tensor):
         # (batch_size, img_channels, img_size, img_size) -> (batch_size, vae_features_dims[0], img_size, img_size)
         x = self.projection_layer(x)
 
-        # (batch_size, vae_features_dims[0], img_size, img_size) -> (batch_size, attn_dim, img_latent_size, img_latent_size) 
-        # where img_latent_size = img_size // 2^(len(vae_features_dims))
+        # (batch_size, vae_features_dims[0], img_size, img_size) -> (batch_size, attn_dim, img_size // 8, img_size // 8) 
         for layer in self.enc_layers:
             x = layer(x)
 
-        # (batch_size, attn_dim, img_latent_size, img_latent_size) -> (batch_size, attn_dim, img_latent_size, img_latent_size)
+        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
         x = self.attn_layer(x)
 
-        # (batch_size, attn_dim, img_latent_size, img_latent_size) -> (batch_size, vae_latent_dim, img_latent_size, img_latent_size)
+        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, vae_latent_dim * 2, img_size // 8, img_size // 8)
         x = self.latent_dim_proj_layer(x)
 
-        # (batch_size, vae_latent_dim, img_latent_size, img_latent_size) -> 2 tensors of shape (batch_size, vae_latent_dim // 2, img_latent_size, img_latent_size)
+        # (batch_size, vae_latent_dim * 2, img_size // 8, img_size // 8) -> 2 tensors of shape (batch_size, vae_latent_dim, img_size // 8, img_size // 8)
         mean, log_var = torch.chunk(x, 2, dim=1)
         print(mean.shape, log_var.shape)
 
@@ -164,7 +163,7 @@ class VAE_Encoder(nn.Module):
 
         std = variance.sqrt()
 
-        # (batch_size, vae_latent_dim // 2, img_latent_size, img_latent_size)
+        # (batch_size, vae_latent_dim, img_size // 8, img_size // 8)
         x = mean + std * noise
 
         # Scale the output as in original repository
@@ -180,8 +179,8 @@ class VAE_Decoder(nn.Module):
         attn_dim = vae_features_dims[-1]
 
         self.first_proj_layer = nn.Sequential(
-            nn.Conv2d(vae_latent_dim // 2, vae_latent_dim // 2, kernel_size=1, bias=False),
-            nn.Conv2d(vae_latent_dim // 2, attn_dim, kernel_size=3, padding=1, bias=False)
+            nn.Conv2d(vae_latent_dim, vae_latent_dim, kernel_size=1, bias=False),
+            nn.Conv2d(vae_latent_dim, attn_dim, kernel_size=3, padding=1, bias=False)
         )
 
         self.attn_layer = nn.Sequential(
@@ -224,13 +223,13 @@ class VAE_Decoder(nn.Module):
     def forward(self, x):
         x *= 0.18215
         
-        # (batch_size, vae_latent_dim // 2, img_latent_size, img_latent_size) -> (batch_size, attn_dim, img_latent_size, img_latent_size)
+        # (batch_size, vae_latent_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
         x = self.first_proj_layer(x)
 
-        # (batch_size, attn_dim, img_latent_size, img_latent_size) -> (batch_size, attn_dim, img_latent_size, img_latent_size)
+        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
         x = self.attn_layer(x)
 
-        # (batch_size, attn_dim, img_latent_size, img_latent_size) -> (batch_size, vae_features_dims[0], img_size, img_size)
+        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, vae_features_dims[0], img_size, img_size)
         for layer in self.dec_layers:
             x = layer(x)
         
