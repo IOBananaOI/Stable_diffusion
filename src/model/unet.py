@@ -67,13 +67,69 @@ class UNet_ResidualBlock(nn.Module):
     
 
 class UNet_AttentionBlock(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, num_heads : int, emb_dim : int) -> None:
+        super().__init__()
+        num_channels = num_heads * emb_dim
+
+        self.norm = nn.GroupNorm(32, num_channels)
+        self.conv = nn.Conv2d(num_channels, num_channels, kernel_size=1)
+
+        self.ln_1 = nn.LayerNorm(num_channels)
+        self.ln_2 = nn.LayerNorm(num_channels)
+        self.ln_3 = nn.LayerNorm(num_channels)
+
+        self.self_attn = nn.MultiheadAttention(num_channels, num_heads)
+        self.cross_attn = nn.MultiheadAttention(num_channels, num_heads)
+
+        self.linear_1 = nn.Linear(num_channels, num_channels * 8)
+        self.linear_2 = nn.Linear(4 * num_channels, num_channels)
+
+        self.conv_output = nn.Conv2d(num_channels, num_channels, kernel_size=1)
 
 
-    def forward(self, x):
-        
+    def forward(self, x, context):
+        resid_1 = x
 
+        x = self.norm(x)
+
+        x = self.conv(x)
+
+        n, c, h, w = x.shape
+
+        x = x.view(n, c, h * w)
+
+        x = x.transpose(-1, -2)
+
+        resid_2 = x
+
+        x = self.ln_1(x)
+        x, _ = self.self_attn(x, x, x, need_weights=False)
+        x += resid_2
+
+        resid_2 = x
+
+        x = self.ln_2(x)
+
+        x, _ = self.cross_attn(x, context, x, need_weights=False)
+
+        x += resid_2
+
+        resid_2 = x
+
+        x = self.ln_3(x)
+
+        x, gate = self.linear_1(x).chunk(2, dim=-1)
+        x = x * F.gelu(gate)
+
+        x = self.linear_2(x)
+
+        x += resid_2
+
+        x = x.transpose(-1, -2)
+
+        x = x.view((n, c, h, w))
+
+        x = self.conv_output(x) + resid_1
 
         return x
 
@@ -114,19 +170,19 @@ class UNet(nn.Module):
         
         self.time_embedding = UNet_TimeEmbedding(time_emb_dim, time_emb_dim_scale_factor)
 
-        self.encoder = nn.Sequential(
+        self.encoder = nn.ModuleList([
             ### BLOCK 1
             # (batch_size, vae_latent_dim, img_size // 8, img_size // 8) -> (batch_size, unet_features_dims[0], img_size // 8, img_size // 8)
 
             SwitchSequential(nn.Conv2d(vae_latent_dim, unet_features_dims[0], kernel_size=3, padding=1)),
             
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0]), 
+                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim)
             ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0]), 
+                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim)
             ),
 
@@ -136,12 +192,12 @@ class UNet(nn.Module):
             SwitchSequential(nn.Conv2d(unet_features_dims[0], unet_features_dims[0], kernel_size=3, stride=2, padding=1)),
             
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[1]), 
+                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[1], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
             ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1]), 
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
             ),
 
@@ -151,12 +207,12 @@ class UNet(nn.Module):
             SwitchSequential(nn.Conv2d(unet_features_dims[1], unet_features_dims[1], kernel_size=3, stride=2, padding=1)),
             
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[2]), 
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[2], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
             ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2]), 
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
             ),
 
@@ -166,51 +222,51 @@ class UNet(nn.Module):
             SwitchSequential(nn.Conv2d(unet_features_dims[2], unet_features_dims[2], kernel_size=3, stride=2, padding=1)),
             
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2])
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
             ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2])
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
             )
             
-        )
+        ])
 
         self.bottleneck = SwitchSequential(
-            UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2]),
+            UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim),
             UNet_AttentionBlock(num_heads, attn_dim * 4),
-            UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2])
+            UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
         )
 
         self.decoder = nn.Sequential(
             ### BLOCK 1
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2])
+                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2])
+                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2]), 
+                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim), 
                 Upsample(unet_features_dims[2])
                 ),
 
             ### BLOCK 2
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2]),
+                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2]),
+                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1] * 3, unet_features_dims[2]),
+                UNet_ResidualBlock(unet_features_dims[1] * 3, unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4),
                 Upsample(unet_features_dims[2])
                 ),
@@ -218,17 +274,17 @@ class UNet(nn.Module):
             ### BLOCK 3
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1] * 3, unet_features_dims[1]),
+                UNet_ResidualBlock(unet_features_dims[1] * 3, unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1] * 2, unet_features_dims[1]),
+                UNet_ResidualBlock(unet_features_dims[1] * 2, unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0] * 3, unet_features_dims[1]),
+                UNet_ResidualBlock(unet_features_dims[0] * 3, unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2),
                 Upsample(unet_features_dims[1])
                 ),
@@ -236,17 +292,17 @@ class UNet(nn.Module):
             ### BLOCK 4
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0] * 3, unet_features_dims[0]),
+                UNet_ResidualBlock(unet_features_dims[0] * 3, unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0]),
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0]),
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim)
                 ),
         )
@@ -258,7 +314,12 @@ class UNet(nn.Module):
             nn.Conv2d(unet_features_dims[0], vae_latent_dim, kernel_size=3, padding=1)
         )
 
-    def forward(self, x):
+    def forward(self, x : torch.Tensor, time : torch.Tensor):
+        time = self.time_embedding(time)
+
+        for layer in self.encoder:
+            x = layer(x, time)
+
         return x
 
 
