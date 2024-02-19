@@ -14,7 +14,7 @@ class StableDiffusionConfig:
 
     # Data info
     img_channels = 3
-    img_size = 512
+    img_size = 256
     vocab_size = 49408
 
     # VAE info

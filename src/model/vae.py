@@ -139,7 +139,7 @@ class VAE_Encoder(nn.Module):
             nn.Conv2d(vae_latent_dim * 2, vae_latent_dim * 2, kernel_size=1)
         )
 
-    def forward(self, x, noise : torch.Tensor):
+    def forward(self, x : torch.Tensor, noise : torch.Tensor):
         # (batch_size, img_channels, img_size, img_size) -> (batch_size, vae_features_dims[0], img_size, img_size)
         x = self.projection_layer(x)
 
@@ -155,13 +155,15 @@ class VAE_Encoder(nn.Module):
 
         # (batch_size, vae_latent_dim * 2, img_size // 8, img_size // 8) -> 2 tensors of shape (batch_size, vae_latent_dim, img_size // 8, img_size // 8)
         mean, log_var = torch.chunk(x, 2, dim=1)
-        print(mean.shape, log_var.shape)
 
         log_var = torch.clamp(log_var, -30, 20)
 
         variance = log_var.exp()
 
         std = variance.sqrt()
+
+        mean = mean.to(noise.device)
+        std = std.to(noise.device)
 
         # (batch_size, vae_latent_dim, img_size // 8, img_size // 8)
         x = mean + std * noise

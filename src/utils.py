@@ -1,19 +1,19 @@
 import sys
 sys.path.insert(0, 'model/')
 
-from model.config import Stable_diffusion_config
+from model.config import StableDiffusionConfig
 
 from pathlib import Path
 
 from torch import nn
 
 
-def get_weights_model_path(config: Stable_diffusion_config, epoch : int):
+def get_weights_model_path(config: StableDiffusionConfig, epoch : int):
     model_filename = f"{config.model_name}{epoch}.pt"
     return str(Path('.') / config.weights_folder / model_filename)
 
 
-def latest_weights_path(config: Stable_diffusion_config):
+def latest_weights_path(config: StableDiffusionConfig):
     """
     Find the latest weights in weights_folder.
     """
