@@ -1,9 +1,12 @@
+import sys
+sys.path.append('../')
+
 import torch
 from torch import nn
 
 import torch.nn.functional as F
 
-from .config import StableDiffusionConfig
+from utils import SelfAttention
 
 class PrenormResidualConnection(nn.Module):
     def __init__(self, sublayer: nn.Module, in_features : int, out_features : int, num_groups : int, dropout : int) -> None:
@@ -80,7 +83,7 @@ class VAE_AttentionBlock(nn.Module):
     def __init__(self, attn_dim : int, num_groups : int, num_heads : int) -> None:
         super().__init__()
         self.norm = nn.GroupNorm(num_groups, attn_dim)
-        self.attn = nn.MultiheadAttention(attn_dim, num_heads=num_heads)
+        self.attn = SelfAttention(1, attn_dim)
 
     def forward(self, x: torch.Tensor):
         resid = x
@@ -94,7 +97,7 @@ class VAE_AttentionBlock(nn.Module):
         x = x.transpose(-1, -2)
 
         # (batch_size, img_size // 8**2, attn_dim) -> (batch_size, img_size // 8**2, attn_dim)
-        x, _ = self.attn(x, x, x, need_weights=False)
+        x = self.attn(x)
 
         # (batch_size, img_size // 8**2, attn_dim) -> (batch_size, attn_dim, img_size // 8**2)
         x = x.transpose(-1, -2)

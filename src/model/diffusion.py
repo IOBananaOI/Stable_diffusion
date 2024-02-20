@@ -55,11 +55,11 @@ class StableDiffusion(nn.Module):
         noise = torch.randn((self.config.batch_size, self.config.vae_latent_dim, img_latent_size, img_latent_size))
         z = self.vae_enc(img, noise).to(self.config.device)
 
-        # Context generation with CLIP
+        # # Context generation with CLIP
         context = self.clip(caption)
 
 
-        # VAE Decoder
-        out = self.vae_dec(z)
+        # # VAE Decoder
+        # out = self.vae_dec(z)
 
-        return out
+        return z

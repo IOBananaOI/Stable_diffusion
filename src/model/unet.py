@@ -1,8 +1,12 @@
+import sys
+sys.path.append('../')
+
 import torch
 
 import torch.nn.functional as F
 from torch import nn
 
+from utils import SelfAttention
 
 class UNet_TimeEmbedding(nn.Module):
     def __init__(self, emb_dim : int, scale_factor : int) -> None:
@@ -78,7 +82,7 @@ class UNet_AttentionBlock(nn.Module):
         self.ln_2 = nn.LayerNorm(num_channels)
         self.ln_3 = nn.LayerNorm(num_channels)
 
-        self.self_attn = nn.MultiheadAttention(num_channels, num_heads)
+        self.self_attn = SelfAttention(num_heads, num_channels)
         self.cross_attn = nn.MultiheadAttention(num_channels, num_heads)
 
         self.linear_1 = nn.Linear(num_channels, num_channels * 8)
@@ -102,15 +106,15 @@ class UNet_AttentionBlock(nn.Module):
 
         resid_2 = x
 
+        # Apply Self Attention
         x = self.ln_1(x)
-        x, _ = self.self_attn(x, x, x, need_weights=False)
+        x = self.self_attn(x)
         x += resid_2
 
+        # Apply Cross Attention
         resid_2 = x
-
         x = self.ln_2(x)
-
-        x, _ = self.cross_attn(x, context, x, need_weights=False)
+        x = self.cross_attn(x, context)
 
         x += resid_2
 
