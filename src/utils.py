@@ -80,47 +80,47 @@ class SelfAttention(nn.Module):
         return output
     
 
-    class CrossAttention(nn.Module):
-        def __init__(self, num_heads : int, emb_dim : int, context_dim : int, in_proj_bias=False, out_proj_bias=False) -> None:
-            super().__init__()
+class CrossAttention(nn.Module):
+    def __init__(self, num_heads : int, emb_dim : int, context_dim : int, in_proj_bias=False, out_proj_bias=False) -> None:
+        super().__init__()
 
-            self.Q = nn.Linear(emb_dim, emb_dim, bias=in_proj_bias)
-            self.K = nn.Linear(context_dim, emb_dim, bias=in_proj_bias)
-            self.V = nn.Linear(emb_dim, emb_dim, bias=in_proj_bias)
-            self.out_layer = nn.Linear(emb_dim, emb_dim, bias=out_proj_bias)
-            self.num_heads = num_heads
-            self.d_head = emb_dim // num_heads
+        self.Q = nn.Linear(emb_dim, emb_dim, bias=in_proj_bias)
+        self.K = nn.Linear(context_dim, emb_dim, bias=in_proj_bias)
+        self.V = nn.Linear(context_dim, emb_dim, bias=in_proj_bias)
+        self.out_layer = nn.Linear(emb_dim, emb_dim, bias=out_proj_bias)
+        self.num_heads = num_heads
+        self.d_head = emb_dim // num_heads
 
-        def forward(self, x : torch.Tensor, context : torch.Tensor):
-            input_shape = x.shape
+    def forward(self, x : torch.Tensor, context : torch.Tensor):
+        input_shape = x.shape
 
-            batch_size, seq_len, emb_dim = input_shape
+        batch_size, seq_len, emb_dim = input_shape
 
-            attn_shape = (batch_size, -1, self.num_heads, self.d_head)
+        attn_shape = (batch_size, -1, self.num_heads, self.d_head)
 
-            q = self.Q(x)
-            k = self.K(context)
-            v = self.V(context)
+        q = self.Q(x)
+        k = self.K(context)
+        v = self.V(context)
 
-            q = q.view(attn_shape).transpose(1, 2)
-            k = k.view(attn_shape).transpose(1, 2)
-            v = v.view(attn_shape).transpose(1, 2)
+        q = q.view(attn_shape).transpose(1, 2)
+        k = k.view(attn_shape).transpose(1, 2)
+        v = v.view(attn_shape).transpose(1, 2)
 
-            weights = q @ k.transpose(-1, -2)
+        weights = q @ k.transpose(-1, -2)
 
-            weights /= math.sqrt(self.d_head)
+        weights /= math.sqrt(self.d_head)
 
-            weights = F.softmax(weights, dim=-1)
+        weights = F.softmax(weights, dim=-1)
 
-            output = weights @ v
+        output = weights @ v
 
-            output = output.transpose(1, 2).contiguous()
+        output = output.transpose(1, 2).contiguous()
 
-            output = output.view(input_shape)
+        output = output.view(input_shape)
 
-            output = self.out_layer(output)
+        output = self.out_layer(output)
 
-            return output
+        return output
 
 
 

@@ -48,18 +48,23 @@ class StableDiffusion(nn.Module):
             config.unet_time_emb_dim_scale_factor
         )
 
-    def forward(self, img : torch.Tensor, caption : torch.Tensor):
+    def forward(self, img : torch.Tensor, caption : torch.Tensor, time : torch.Tensor):
         img_latent_size = self.config.img_size // 2**(len(self.config.vae_features_dims))
 
         # VAE ENCODER 
         noise = torch.randn((self.config.batch_size, self.config.vae_latent_dim, img_latent_size, img_latent_size))
-        z = self.vae_enc(img, noise).to(self.config.device)
+        z = self.vae_enc(img, noise)
 
-        # # Context generation with CLIP
+        # Context generation with CLIP
         context = self.clip(caption)
 
+        # UNET
 
-        # # VAE Decoder
-        # out = self.vae_dec(z)
+        z = self.unet(z, time, context)
+
+        print(z.shape)
+
+        # VAE Decoder
+        out = self.vae_dec(z)
 
         return z
