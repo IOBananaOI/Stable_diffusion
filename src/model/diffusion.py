@@ -11,7 +11,9 @@ from .vae import VAE_Encoder, VAE_Decoder
 from .unet import UNet
 from .clip import CLIPEncoder
 from .tokenizer import Tokenizer
-from utils import get_time_embedding
+from utils import KLMSSampler
+
+from tqdm import tqdm
 
 class StableDiffusion(nn.Module):
     def __init__(self, config : StableDiffusionConfig) -> None:
@@ -71,7 +73,6 @@ class StableDiffusion(nn.Module):
             strength=0.8,
             do_cfg=True,
             cfg_scale=7.5,
-            sampler_name='ddpm',
             n_inference_steps=50,
             seed=None
     ):
@@ -109,33 +110,39 @@ class StableDiffusion(nn.Module):
 
             del tokenizer
 
-            sampler = DDPMSampler()
+            sampler = KLMSSampler(n_inference_steps=n_inference_steps)
 
             noise_shape = (1, self.config.vae_latent_dim, self.config.latent_img_size)
 
-            noise = torch.randn(noise_shape, generator=generator, device=self.device)
-            noise *= sampler.initial_scale
+            latents = torch.randn(noise_shape, generator=generator, device=self.device)
+            latents *= sampler.initial_scale
 
-            timesteps = sampler.timesteps
-            for i, timestep in enumerate(timesteps):
+            timesteps = tqdm(sampler.timesteps)
+            for _, timestep in enumerate(timesteps):
                 time_embedding = self.get_time_embedding(timestep)
 
                 # (batch_size, vae_latent_dim, latent_img_size, latent_img_size)
-                model_input = noise * sampler.get_input_scale()
+                model_input = latents * sampler.get_input_scale()
 
                 if do_cfg:
                     # (batch_size, vae_latent_dim, latent_img_size, latent_img_size) -> # (2 * batch_size, vae_latent_dim, latent_img_size, latent_img_size)
                     model_input = model_input.repeat(2, 1, 1, 1)
 
-                model_output = self.unet(model_input, context, time_embedding)
+                model_output = self.unet(model_input, time_embedding, context)
 
                 if do_cfg:
                     output_cond, output_uncond = model_input.chunk(2)
 
                     model_output = cfg_scale * (output_cond - output_uncond) + output_uncond
-
                 
-        
+                # Remove noise
+                latents = sampler.step(timestep, latents, model_output)
+
+                images = self.decoder(latents)
+                images = images.permute(0, 2, 3, 1)
+                images = images.to('cpu', torch.uint8).numpy()
+
+                return images[0]       
 
 
     def forward(self, img : torch.Tensor, caption : torch.Tensor, time : torch.Tensor):
