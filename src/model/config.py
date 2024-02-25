@@ -24,6 +24,9 @@ class StableDiffusionConfig:
     vae_num_heads = 8
     vae_dropout = 0.2
 
+    # Latent img_size
+    latent_img_size = img_size // len(vae_features_dims)
+
     # CLIP info
     clip_emb_dim = 768
     clip_seq_len = 77

@@ -87,19 +87,19 @@ class VAE_AttentionBlock(nn.Module):
 
         n, c, h, w = x.shape
         
-        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8**2) 
+        # (batch_size, attn_dim, latent_img_size, latent_img_size) -> (batch_size, attn_dim, latent_img_size**2) 
         x = x.view(n, c, h * w)
 
-        # (batch_size, attn_dim, img_size // 8**2) -> (batch_size, img_size // 8**2, attn_dim) 
+        # (batch_size, attn_dim, latent_img_size**2) -> (batch_size, latent_img_size**2, attn_dim) 
         x = x.transpose(-1, -2)
 
-        # (batch_size, img_size // 8**2, attn_dim) -> (batch_size, img_size // 8**2, attn_dim)
+        # (batch_size, latent_img_size**2, attn_dim) -> (batch_size, latent_img_size**2, attn_dim)
         x, _ = self.attn(x, x, x, need_weights=False)
 
-        # (batch_size, img_size // 8**2, attn_dim) -> (batch_size, attn_dim, img_size // 8**2)
+        # (batch_size, latent_img_size**2, attn_dim) -> (batch_size, attn_dim, latent_img_size**2)
         x = x.transpose(-1, -2)
 
-        # (batch_size, attn_dim, img_size // 8**2) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
+        # (batch_size, attn_dim, latent_img_size**2) -> (batch_size, attn_dim, latent_img_size, latent_img_size)
         x = x.view(n, c, h, w)
 
         x += resid
@@ -143,17 +143,17 @@ class VAE_Encoder(nn.Module):
         # (batch_size, img_channels, img_size, img_size) -> (batch_size, vae_features_dims[0], img_size, img_size)
         x = self.projection_layer(x)
 
-        # (batch_size, vae_features_dims[0], img_size, img_size) -> (batch_size, attn_dim, img_size // 8, img_size // 8) 
+        # (batch_size, vae_features_dims[0], img_size, img_size) -> (batch_size, attn_dim, latent_img_size, latent_img_size) 
         for layer in self.enc_layers:
             x = layer(x)
 
-        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
+        # (batch_size, attn_dim, latent_img_size, latent_img_size) -> (batch_size, attn_dim, latent_img_size, latent_img_size)
         x = self.attn_layer(x)
 
-        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, vae_latent_dim * 2, img_size // 8, img_size // 8)
+        # (batch_size, attn_dim, latent_img_size, latent_img_size) -> (batch_size, vae_latent_dim * 2, latent_img_size, latent_img_size)
         x = self.latent_dim_proj_layer(x)
 
-        # (batch_size, vae_latent_dim * 2, img_size // 8, img_size // 8) -> 2 tensors of shape (batch_size, vae_latent_dim, img_size // 8, img_size // 8)
+        # (batch_size, vae_latent_dim * 2, latent_img_size, latent_img_size) -> 2 tensors of shape (batch_size, vae_latent_dim, latent_img_size, latent_img_size)
         mean, log_var = torch.chunk(x, 2, dim=1)
 
         log_var = torch.clamp(log_var, -30, 20)
@@ -165,7 +165,7 @@ class VAE_Encoder(nn.Module):
         mean = mean.to(noise.device)
         std = std.to(noise.device)
 
-        # (batch_size, vae_latent_dim, img_size // 8, img_size // 8)
+        # (batch_size, vae_latent_dim, latent_img_size, latent_img_size)
         x = mean + std * noise
 
         # Scale the output as in original repository
@@ -225,13 +225,13 @@ class VAE_Decoder(nn.Module):
     def forward(self, x):
         x *= 0.18215
         
-        # (batch_size, vae_latent_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
+        # (batch_size, vae_latent_dim, latent_img_size, latent_img_size) -> (batch_size, attn_dim, latent_img_size, latent_img_size)
         x = self.first_proj_layer(x)
 
-        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, attn_dim, img_size // 8, img_size // 8)
+        # (batch_size, attn_dim, latent_img_size, latent_img_size) -> (batch_size, attn_dim, latent_img_size, latent_img_size)
         x = self.attn_layer(x)
 
-        # (batch_size, attn_dim, img_size // 8, img_size // 8) -> (batch_size, vae_features_dims[0], img_size, img_size)
+        # (batch_size, attn_dim, latent_img_size, latent_img_size) -> (batch_size, vae_features_dims[0], img_size, img_size)
         for layer in self.dec_layers:
             x = layer(x)
         
