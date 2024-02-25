@@ -1,8 +1,12 @@
+import sys
+sys.path.append('../')
+
 import torch
 
 import torch.nn.functional as F
 from torch import nn
 
+from utils import SelfAttention, CrossAttention
 
 class UNet_TimeEmbedding(nn.Module):
     def __init__(self, emb_dim : int, scale_factor : int) -> None:
@@ -41,7 +45,7 @@ class UNet_ResidualBlock(nn.Module):
 
     def forward(self, x : torch.Tensor, time : torch.Tensor):
         # x: (batch_size, in_features, img_size, img_size)
-        # time (1, unet_features_dims[-1])
+        # time: (1, unet_features_dims[-1])
 
         resid = x
 
@@ -67,7 +71,7 @@ class UNet_ResidualBlock(nn.Module):
     
 
 class UNet_AttentionBlock(nn.Module):
-    def __init__(self, num_heads : int, emb_dim : int) -> None:
+    def __init__(self, num_heads : int, emb_dim : int, context_dim : int = 768) -> None:
         super().__init__()
         num_channels = num_heads * emb_dim
 
@@ -78,8 +82,8 @@ class UNet_AttentionBlock(nn.Module):
         self.ln_2 = nn.LayerNorm(num_channels)
         self.ln_3 = nn.LayerNorm(num_channels)
 
-        self.self_attn = nn.MultiheadAttention(num_channels, num_heads)
-        self.cross_attn = nn.MultiheadAttention(num_channels, num_heads)
+        self.self_attn = SelfAttention(num_heads, num_channels)
+        self.cross_attn = CrossAttention(num_heads, num_channels, context_dim)
 
         self.linear_1 = nn.Linear(num_channels, num_channels * 8)
         self.linear_2 = nn.Linear(4 * num_channels, num_channels)
@@ -102,15 +106,15 @@ class UNet_AttentionBlock(nn.Module):
 
         resid_2 = x
 
+        # Apply Self Attention
         x = self.ln_1(x)
-        x, _ = self.self_attn(x, x, x, need_weights=False)
+        x = self.self_attn(x)
         x += resid_2
 
+        # Apply Cross Attention
         resid_2 = x
-
         x = self.ln_2(x)
-
-        x, _ = self.cross_attn(x, context, x, need_weights=False)
+        x = self.cross_attn(x, context)
 
         x += resid_2
 
@@ -169,6 +173,8 @@ class UNet(nn.Module):
         super().__init__()
         
         self.time_embedding = UNet_TimeEmbedding(time_emb_dim, time_emb_dim_scale_factor)
+
+        time_emb_dim *= time_emb_dim_scale_factor
 
         self.encoder = nn.ModuleList([
             ### BLOCK 1
@@ -237,7 +243,7 @@ class UNet(nn.Module):
             UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
         )
 
-        self.decoder = nn.Sequential(
+        self.decoder = nn.ModuleList([
             ### BLOCK 1
 
             SwitchSequential(
@@ -305,7 +311,7 @@ class UNet(nn.Module):
                 UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim)
                 ),
-        )
+        ])
 
 
         self.output_layer = nn.Sequential(
@@ -314,12 +320,27 @@ class UNet(nn.Module):
             nn.Conv2d(unet_features_dims[0], vae_latent_dim, kernel_size=3, padding=1)
         )
 
-    def forward(self, x : torch.Tensor, time : torch.Tensor):
+    def forward(self, x : torch.Tensor, time : torch.Tensor, context : torch.Tensor):
         time = self.time_embedding(time)
 
+        # Encoder part
         for layer in self.encoder:
-            x = layer(x, time)
+            x = layer(x, context, time)
 
-        return x
+        print(x.shape)
+
+        # Bottleneck
+        x = self.bottleneck(x, context, time)
+        print(x.shape)
+
+        # Decoder part
+        for layer in self.decoder:
+            x = layer(x, context, time)
+
+        
+        # Output layer
+        out = self.output_layer(x)
+
+        return out
 
 

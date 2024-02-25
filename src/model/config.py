@@ -9,7 +9,7 @@ import torch
 class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    batch_size = 32
+    batch_size = 1
     num_epochs = 20
 
     # Data info

@@ -1,5 +1,10 @@
+import sys
+sys.path.append('../')
+
 import torch
 from torch import nn
+
+from utils import SelfAttention
 
 class CLIPEmbedding(nn.Module):
     def __init__(self, vocab_size : int, emb_dim : int, seq_len : int):
@@ -23,7 +28,7 @@ class CLIPLayer(nn.Module):
         super().__init__()
 
         self.norm_1 = nn.LayerNorm(emb_dim)
-        self.attn_layer = nn.MultiheadAttention(emb_dim, num_heads, dropout)
+        self.attn_layer = SelfAttention(num_heads, emb_dim)
         self.norm_2 = nn.LayerNorm(emb_dim)
         self.linear_1 = nn.Linear(emb_dim, emb_dim * emb_dim_scale_factor)
         self.linear_2 = nn.Linear(emb_dim * emb_dim_scale_factor, emb_dim)
@@ -33,7 +38,7 @@ class CLIPLayer(nn.Module):
 
         x = self.norm_1(x)
 
-        x, _ = self.attn_layer(x, x, x, is_causal=True, need_weights=False)
+        x = self.attn_layer(x, causal_mask=True)
 
         x += resid
 
