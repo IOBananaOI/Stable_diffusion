@@ -17,6 +17,10 @@ class StableDiffusionConfig:
     img_size = 256
     vocab_size = 49408
 
+    # Tokenizer info
+    tokenizer_vocab_path = 'vocab.json'
+    tokenizer_merges_path = 'merges.txt'
+
     # VAE info
     vae_features_dims = [128, 256, 512]
     vae_latent_dim = 4
@@ -42,6 +46,7 @@ class StableDiffusionConfig:
     unet_attn_num_heads = 8
     unet_attn_dim = 40
 
+
     T = 2000
     d_model = 1024
 
@@ -53,3 +58,4 @@ class StableDiffusionConfig:
     # Model saving
     weights_folder = "weights/"
     model_name = "stable_diffusion_"
+    weights_name = None

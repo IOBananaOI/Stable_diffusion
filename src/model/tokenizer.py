@@ -3,8 +3,11 @@ import functools
 import json
 from typing import List, Tuple
 import regex as re
-from . import util
 
+import sys
+sys.path.append('../')
+
+from .config import StableDiffusionConfig
 
 def create_bytes_table() -> dict:
     table = {}
@@ -25,11 +28,11 @@ def pairwise(seq):
     return zip(a, b)
 
 class Tokenizer:
-    def __init__(self, ):
-        with open(util.get_file_path('vocab.json'), encoding='utf-8') as f:
+    def __init__(self, config : StableDiffusionConfig):
+        with open(config.tokenizer_vocab_path, encoding='utf-8') as f:
             self.vocab = json.load(f)
 
-        with open(util.get_file_path('merges.txt'), encoding='utf-8') as f:
+        with open(config.tokenizer_merges_path, encoding='utf-8') as f:
             lines = f.read().split('\n')
             lines = lines[1:-1]
             self.merges = {tuple(bigram.split()): i for i, bigram in enumerate(lines)}
