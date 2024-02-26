@@ -5,11 +5,11 @@ import os
 import torch
 
 
-@dataclass
+@dataclass(init=True)
 class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    batch_size = 1
+    batch_size : int = 1
     num_epochs = 20
 
     # Data info
@@ -18,8 +18,8 @@ class StableDiffusionConfig:
     vocab_size = 49408
 
     # Tokenizer info
-    tokenizer_vocab_path = 'vocab.json'
-    tokenizer_merges_path = 'merges.txt'
+    tokenizer_vocab_path = '../../data/vocab.json'
+    tokenizer_merges_path = '../../data/merges.txt'
 
     # VAE info
     vae_features_dims = [128, 256, 512]
@@ -58,4 +58,4 @@ class StableDiffusionConfig:
     # Model saving
     weights_folder = "weights/"
     model_name = "stable_diffusion_"
-    weights_name = None
+    weights_name : str = None
