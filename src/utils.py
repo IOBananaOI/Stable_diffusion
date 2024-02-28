@@ -132,4 +132,11 @@ def get_alpha_bar(beta_start=0.00085, beta_end=0.0120, n_training_steps=1000):
     return alphas_cumprod
 
 
-def forward_diffusion(config : StableDiffusionConfig, )
+def forward_diffusion(config : StableDiffusionConfig):
+
+    sqrt_alphas_cumprod_t = get_index(sqrt_alphas_cumprod, t, x0.shape).to(device)
+    sqrt_one_minus_alphas_cumprod_t = get_index(sqrt_one_minus_alphas_cumprod, t, x0.shape).to(device)
+    
+    eps = torch.randn_like(x0.float()).to(device)
+
+    return sqrt_alphas_cumprod_t * x0 + sqrt_one_minus_alphas_cumprod_t * eps, eps
