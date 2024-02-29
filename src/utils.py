@@ -32,6 +32,14 @@ def latest_weights_path(config: StableDiffusionConfig):
     return str(weights_files[-1])
 
 
+def get_index(vals, t, tensor_shape, device):
+    t_batch_size = t.shape[0]
+
+    out = vals.gather(-1, t)
+    
+    return out.reshape(t_batch_size, *((1,) * (len(tensor_shape) - 1))).to(device)
+
+
 class SelfAttention(nn.Module):
     def __init__(self, num_heads : int, emb_dim : int, in_proj_bias=True, out_proj_bias=True) -> None:
         super().__init__()
@@ -125,18 +133,11 @@ class CrossAttention(nn.Module):
         return output
 
 
-def get_alpha_bar(beta_start=0.00085, beta_end=0.0120, n_training_steps=1000):
-    betas = np.linspace(beta_start ** 0.5, beta_end ** 0.5, n_training_steps, dtype=np.float32) ** 2
-    alphas = 1.0 - betas
-    alphas_cumprod = np.cumprod(alphas, axis=0)
-    return alphas_cumprod
+def forward_diffusion(config : StableDiffusionConfig, x0 : torch.Tensor, t):
 
-
-def forward_diffusion(config : StableDiffusionConfig):
-
-    sqrt_alphas_cumprod_t = get_index(sqrt_alphas_cumprod, t, x0.shape).to(device)
-    sqrt_one_minus_alphas_cumprod_t = get_index(sqrt_one_minus_alphas_cumprod, t, x0.shape).to(device)
+    sqrt_alphas_cumprod_t = get_index(config.sqrt_alphas_cumprod, t, x0.shape, config.device)
+    sqrt_one_minus_alphas_cumprod_t = get_index(config.sqrt_one_minus_alphas_cumprod, t, x0.shape, config.device)
     
-    eps = torch.randn_like(x0.float()).to(device)
+    eps = torch.randn_like(x0.float()).to(config.device)
 
     return sqrt_alphas_cumprod_t * x0 + sqrt_one_minus_alphas_cumprod_t * eps, eps

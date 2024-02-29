@@ -2,7 +2,28 @@ from dataclasses import dataclass
 
 import os
 
+import numpy as np
 import torch
+
+import torch.nn.functional as F
+
+def get_alpha_bar(T, device, s = 0.08):
+    f = lambda t: np.cos((t + s) / (1 + s) * np.pi/2)**2
+    
+    return torch.tensor([f((t+1) / T)/f(0) for t in range(T)], device=device, dtype=torch.float32)
+
+
+def get_betas_from_alpha_bar(device, T, max_beta = 0.999, s = 0.08):
+    f = lambda t: np.cos((t + s) / (1 + s) * np.pi/2)**2
+
+    betas = []
+    for t in range(T):
+        t1 = t / T
+        t2 = (t + 1) / T
+        
+        betas.append(min(1 - f(t2)/f(t1), max_beta))
+
+    return torch.tensor(betas, device=device)
 
 
 @dataclass(init=True)
@@ -47,9 +68,17 @@ class StableDiffusionConfig:
     unet_attn_num_heads = 8
     unet_attn_dim = 40
 
-
+    # Forward diffusion info
     T = 2000
-    d_model = 1024
+    alpha_bar = get_alpha_bar(T, device)
+
+    alpha_bar_prev = F.pad(alpha_bar[:-1], (1, 0), value=1.0)
+    betas = get_betas_from_alpha_bar(device, T)
+    alphas = 1. - betas
+    posterior_variance = betas * (1. - alpha_bar_prev) / (1. - alpha_bar)
+    sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
+    sqrt_alphas_cumprod = torch.sqrt(alpha_bar)
+    sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - alpha_bar)    
 
     # Neptune log tracking
     neptune_project_name = "bng215/Transformer-edu",

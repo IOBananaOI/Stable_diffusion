@@ -11,7 +11,6 @@ from .vae import VAE_Encoder, VAE_Decoder
 from .unet import UNet
 from .clip import CLIPEncoder
 from .tokenizer import Tokenizer
-from utils import KLMSSampler
 
 from tqdm import tqdm
 
