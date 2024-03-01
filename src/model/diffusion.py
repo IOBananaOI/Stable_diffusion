@@ -62,105 +62,61 @@ class StableDiffusion(nn.Module):
         freqs = torch.pow(10000, -torch.arange(start=0, end=160, dtype=torch.float32) / 160)
         x = torch.tensor([timestep], dtype=torch.float32)[:, None] * freqs[None]
         x = torch.cat([torch.cos(x), torch.sin(x)], dim=-1).to(self.device)
-        return x
+        return x   
 
 
-    def generate(
+    def forward(
             self, 
-            prompt : str,
-            uncond_prompt : str = None,
-            strength=0.8,
-            do_cfg=True,
-            cfg_scale=7.5,
-            n_inference_steps=50,
-            seed=None
-    ):
-        with torch.no_grad():
-            assert 0 <= strength <= 1, "Strength must me between 0 and 1"
-
-            generator = torch.Generator(device=self.device)
-            if seed is None:
-                generator.seed()
-            else:
-                generator.manual_seed(seed)
-
-            uncond_prompt = uncond_prompt or [""] * len(prompt)
-
-            tokenizer = Tokenizer()
-
-            if do_cfg:
-                # Tokenize the prompt
-                cond_tokens = tokenizer.encode_batch(prompt)
-                cond_tokens = torch.tensor(cond_tokens, dtype=torch.long, device=self.device)
-                cond_context = self.clip(cond_tokens)
-
-                # Handling uncond_prompt
-                uncond_tokens = tokenizer.encode_batch(uncond_prompt)
-                uncond_tokens = torch.tensor(uncond_tokens, dtype=torch.long, device=self.device)
-                uncond_context = self.clip(uncond_tokens)
-
-                context = torch.cat([cond_context, uncond_context])
-
-            else:
-                tokens = tokenizer.encode_batch(prompt)
-                tokens = torch.tensor(tokens, dtype=torch.long, device=self.device)
-
-                context = self.clip(tokens)
-
-            del tokenizer
-
-            sampler = KLMSSampler(n_inference_steps=n_inference_steps)
-
-            noise_shape = (1, self.config.vae_latent_dim, self.config.latent_img_size)
-
-            latents = torch.randn(noise_shape, generator=generator, device=self.device)
-            latents *= sampler.initial_scale
-
-            timesteps = tqdm(sampler.timesteps)
-            for _, timestep in enumerate(timesteps):
-                time_embedding = self.get_time_embedding(timestep)
-
-                # (batch_size, vae_latent_dim, latent_img_size, latent_img_size)
-                model_input = latents * sampler.get_input_scale()
-
-                if do_cfg:
-                    # (batch_size, vae_latent_dim, latent_img_size, latent_img_size) -> # (2 * batch_size, vae_latent_dim, latent_img_size, latent_img_size)
-                    model_input = model_input.repeat(2, 1, 1, 1)
-
-                model_output = self.unet(model_input, time_embedding, context)
-
-                if do_cfg:
-                    output_cond, output_uncond = model_input.chunk(2)
-
-                    model_output = cfg_scale * (output_cond - output_uncond) + output_uncond
-                
-                # Remove noise
-                latents = sampler.step(timestep, latents, model_output)
-
-                images = self.decoder(latents)
-                images = images.permute(0, 2, 3, 1)
-                images = images.to('cpu', torch.uint8).numpy()
-
-                return images[0]       
-
-
-    def forward(self, img : torch.Tensor, caption : torch.Tensor, time : torch.Tensor):
-        img_latent_size = self.config.img_size // 2**(len(self.config.vae_features_dims))
+            img : torch.Tensor, 
+            caption : torch.Tensor, 
+            time : torch.Tensor,
+            tokenizer : Tokenizer,
+            do_cfg=True
+            ):
 
         # VAE ENCODER 
-        noise = torch.randn((self.config.batch_size, self.config.vae_latent_dim, img_latent_size, img_latent_size))
-        z = self.vae_enc(img, noise)
+        noise = torch.randn((self.config.batch_size, self.config.vae_latent_dim, self.config.img_latent_size, self.config.img_latent_size))
+        
+        # Get reduced img
+        img = self.vae_enc(img, noise)
 
         # Context generation with CLIP
-        context = self.clip(caption)
+
+        if do_cfg:
+            # Tokenize the prompt
+            cond_tokens = tokenizer.encode_batch(caption)
+            cond_tokens = torch.tensor(cond_tokens, dtype=torch.long, device=self.device)
+            cond_context = self.clip(cond_tokens)
+
+            # Handling uncond_prompt
+            uncond_prompt = uncond_prompt or [""] * len(caption)
+            uncond_tokens = tokenizer.encode_batch(uncond_prompt)
+            uncond_tokens = torch.tensor(uncond_tokens, dtype=torch.long, device=self.device)
+            uncond_context = self.clip(uncond_tokens)
+
+            context = torch.cat([cond_context, uncond_context])
+
+        else:
+            tokens = tokenizer.encode_batch(caption)
+            tokens = torch.tensor(tokens, dtype=torch.long, device=self.device)
+
+        context = self.clip(tokens)
 
         # UNET
+        time = self.get_time_embedding(time)
 
-        z = self.unet(z, time, context)
+        if do_cfg:
+            # (batch_size, vae_latent_dim, latent_img_size, latent_img_size) -> # (2 * batch_size, vae_latent_dim, latent_img_size, latent_img_size)
+            img = img.repeat(2, 1, 1, 1)
 
-        print(z.shape)
+        unet_output = self.unet(img, time, context)
+
+        if do_cfg:
+            output_cond, output_uncond = unet_output.chunk(2)
+
+            unet_output = self.config.cfg_scale * (output_cond - output_uncond) + output_uncond
 
         # VAE Decoder
-        out = self.vae_dec(z)
+        out = self.vae_dec(unet_output)
 
-        return z
+        return out

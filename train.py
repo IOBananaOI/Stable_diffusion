@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.model.config import StableDiffusionConfig
 from src.model.diffusion import StableDiffusion
-from src.utils import forward_diffusion
+from src.utils import forward_diffusion, get_sample
 from src.model.tokenizer import Tokenizer
 
 
@@ -26,6 +26,12 @@ def get_args_parser():
     parser.add_argument('--num_epochs', type=int)
     parser.add_argument('--batch_size', type=int)
     parser.add_argument('--lr', type=float)
+    parser.add_argument('--preload', type=bool)
+    parser.add_argument('--to_eval', type=bool)
+
+    # Classifier free guidance
+    parser.add_argument('--do_cfg', type=bool)
+    parser.add_argument('--cfg_scale', type=float)
 
     # Neptune settings
     parser.add_argument('--neptune_run_id', type=str)
@@ -80,10 +86,11 @@ def load_weights(
     return model, optimizer, epoch
 
 
-def save_model(config : StableDiffusionConfig, model : StableDiffusion, optimizer : Optimizer, epoch : int):
+def save_weights(config : StableDiffusionConfig, model : StableDiffusion, optimizer : Optimizer, lr : float, epoch : int):
     state_dict = {
         'model_state_dict' : model.state_dict(),
         'optimizer_state_dict' : optimizer.state_dict(),
+        'lr' : lr,
         'epoch' : epoch
     }
 
@@ -94,22 +101,29 @@ def train_model(
         config : StableDiffusionConfig,
         model : StableDiffusion,
         optimizer : Optimizer,
-        dataloader : DataLoader,
-        num_epochs : int,
-        init_epoch : int
+        criterion,
+        dataloader : DataLoader
     ):
+    # Weights preloading
+    if config.preload:
+        model, optimizer, start_epoch = load_weights(config, model, optimizer)
+    else:
+        start_epoch = 0
     
-    for epoch in range(init_epoch, num_epochs):
-
+    # Iterate over epochs from initial one
+    for epoch in range(start_epoch, config.num_epochs):
         with tqdm(dataloader, unit='batch') as tepoch:
             for batch in tepoch:
                 tepoch.set_description(f"Epoch {epoch+1}")
-                # Get img tensors from batch
-                img_tensor = batch[0].to(config.device, dtype=torch.float32)
 
-                # Make tokenization for image captions
+                # Get img tensors from batch
+                img_tensor = batch[:, 0].to(config.device, dtype=torch.float32)
+
+                # Get captions
+                captions = batch[:, 1]
+
+                # Build tokenizer
                 tokenizer = Tokenizer(config)
-                tokens = tokenizer.encode_batch(batch[1])
 
                 # Create t for each image in batch for the following forward diffusion operation
                 t = torch.randint(0, config.T, (config.batch_size,)).long().to(config.device)
@@ -117,7 +131,29 @@ def train_model(
                 # Make forward diffusion and get added noise and noised_images
                 noised_img, noise = forward_diffusion(img_tensor, t)
 
-    pass
+                # Model output
+                predicted_noise = model(noised_img, captions, t, tokenizer, config.do_cfg)
+
+                # Get loss
+                loss = criterion(noise, predicted_noise)
+
+                # Neptune tracking
+                ### TODO
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+        # Evaluation
+        if config.to_eval: 
+            model.eval()
+            generated_img = get_sample(config, model, eval_caption)
+
+        # Model saving
+        if config.saving_strategy == 'all':
+            save_weights(config, model, optimizer, optimizer['lr'], epoch)
+
+
     
 
 if __name__ == '__main__':
@@ -136,5 +172,14 @@ if __name__ == '__main__':
     optimizer = Adam(model.parameters(), lr=config.lr)
 
     # Preloading previous weights for the following training
-    model, optimizer, init_epoch = load_weights(config, model, optimizer)
+    model, optimizer, start_epoch = load_weights(config, model, optimizer)
     
+    # Define criterion
+    criterion = torch.nn.SmoothL1Loss()
+
+    # Get dataloader
+    ### TODO
+    dataloader = []
+
+    # Train the model
+    train_model(config, model, optimizer, criterion, dataloader)

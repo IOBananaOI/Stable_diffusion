@@ -30,9 +30,11 @@ def get_betas_from_alpha_bar(device, T, max_beta = 0.999, s = 0.08):
 class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    batch_size : int = 1
+    batch_size = 16
     num_epochs = 20
     lr = 1e-3
+    preload = True
+    to_eval = True
 
     # Data info
     img_channels = 3
@@ -71,7 +73,6 @@ class StableDiffusionConfig:
     # Forward diffusion info
     T = 2000
     alpha_bar = get_alpha_bar(T, device)
-
     alpha_bar_prev = F.pad(alpha_bar[:-1], (1, 0), value=1.0)
     betas = get_betas_from_alpha_bar(device, T)
     alphas = 1. - betas
@@ -79,6 +80,10 @@ class StableDiffusionConfig:
     sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
     sqrt_alphas_cumprod = torch.sqrt(alpha_bar)
     sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - alpha_bar)    
+
+    # Classifier free guidance
+    do_cfg = True
+    cfg_scale = 7.5
 
     # Neptune log tracking
     neptune_project_name = "bng215/Transformer-edu",
@@ -89,3 +94,4 @@ class StableDiffusionConfig:
     weights_folder = "weights/"
     model_name = "stable_diffusion_"
     weights_name : str = None
+    saving_strategy = 1
