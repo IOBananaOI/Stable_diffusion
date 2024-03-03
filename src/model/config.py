@@ -7,6 +7,8 @@ import torch
 
 import torch.nn.functional as F
 
+from pathlib import Path
+
 def get_alpha_bar(T, device, s = 0.08):
     f = lambda t: np.cos((t + s) / (1 + s) * np.pi/2)**2
     
@@ -30,7 +32,7 @@ def get_betas_from_alpha_bar(device, T, max_beta = 0.999, s = 0.08):
 class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    batch_size : int = 1
+    batch_size = 64
     num_epochs = 20
     lr = 1e-3
 
@@ -38,6 +40,8 @@ class StableDiffusionConfig:
     img_channels = 3
     img_size = 256
     vocab_size = 49408
+    img_path = Path('data/images/train2017/')
+    captions_path = Path('data/captions/captions_train2017.json')
 
     # Tokenizer info
     tokenizer_vocab_path = '../../data/vocab.json'
