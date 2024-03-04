@@ -40,7 +40,7 @@ class Tokenizer:
         self.bos_token = self.vocab["<|startoftext|>"]
         self.eos_token = self.vocab["<|endoftext|>"]
         self.pad_token = self.vocab["<|endoftext|>"]
-        self.max_length = 77
+        self.max_length = config.clip_seq_len
         self.bytes_table = create_bytes_table()
         self.chunk_pattern = re.compile(r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""", re.IGNORECASE)
 

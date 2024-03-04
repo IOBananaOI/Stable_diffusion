@@ -32,11 +32,12 @@ def get_betas_from_alpha_bar(device, T, max_beta = 0.999, s = 0.08):
 class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    batch_size = 64
+    batch_size = 2
     num_epochs = 20
     lr = 1e-3
     preload = True
     to_eval = True
+    eval_caption = "A cat with a hat"
 
     # Data info
     img_channels = 3
@@ -46,8 +47,8 @@ class StableDiffusionConfig:
     captions_path = Path('data/captions/captions_train2017.json')
 
     # Tokenizer info
-    tokenizer_vocab_path = Path('data/vocab.json')
-    tokenizer_merges_path = Path('data/merges.txt')
+    tokenizer_vocab_path = Path('data/tokenizer_vocab.json')
+    tokenizer_merges_path = Path('data/tokenizer_merges.txt')
 
     # VAE info
     vae_features_dims = [128, 256, 512]
@@ -57,15 +58,16 @@ class StableDiffusionConfig:
     vae_dropout = 0.2
 
     # Latent img_size
-    latent_img_size = img_size // len(vae_features_dims)
+    img_latent_size = img_size // 2**len(vae_features_dims)
 
     # CLIP info
     clip_emb_dim = 768
-    clip_seq_len = 77
+    clip_seq_len = 30
     clip_emb_dim_scale_factor = 4
     clip_attn_num_heads = 12
     clip_num_layers = 12
     clip_dropout = 0.1
+
 
     # UNet info
     unet_time_emb_dim = 320
@@ -86,12 +88,12 @@ class StableDiffusionConfig:
     sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - alpha_bar)    
 
     # Classifier free guidance
-    do_cfg = True
+    do_cfg = False
     cfg_scale = 7.5
 
     # Neptune log tracking
-    neptune_project_name = "bng215/Transformer-edu",
-    neptune_project_api_token = os.environ.get('NEPTUNE_API_TOKEN'),
+    neptune_project_name = "bng215/Transformer-edu"
+    neptune_project_api_token = os.environ.get('NEPTUNE_API_TOKEN')
     neptune_run_id = None
 
     # Model saving

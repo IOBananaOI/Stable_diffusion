@@ -5,6 +5,8 @@ import os
 import argparse
 from tqdm import tqdm
 
+import neptune
+
 import torch
 from torch.optim import Optimizer, Adam
 from torch.utils.data import DataLoader
@@ -13,6 +15,7 @@ from src.model.config import StableDiffusionConfig
 from src.model.diffusion import StableDiffusion
 from src.utils import forward_diffusion, get_sample
 from src.model.tokenizer import Tokenizer
+from src.model.dataset import get_dataloader
 
 
 def get_args_parser():
@@ -20,7 +23,7 @@ def get_args_parser():
     parser = argparse.ArgumentParser(description="Model training", add_help=False)
 
     # Weights preloading
-    parser.add_argument('--weights_name', default='latest', type=str)
+    parser.add_argument('--weights_name', type=str)
 
     # Training arguments
     parser.add_argument('--num_epochs', type=int)
@@ -109,6 +112,19 @@ def train_model(
         model, optimizer, start_epoch = load_weights(config, model, optimizer)
     else:
         start_epoch = 0
+
+    run = neptune.init_run(
+    project=config.neptune_project_name,
+    with_id=config.neptune_run_id,
+    api_token=config.neptune_project_api_token,
+    name="stable_diffusion"
+    )
+
+    run['parameters'] = {
+        "init_lr" : config.lr, 
+        "optimizer" : "Adam",
+        "batch_size" : config.batch_size
+    }
     
     # Iterate over epochs from initial one
     for epoch in range(start_epoch, config.num_epochs):
@@ -117,44 +133,45 @@ def train_model(
                 tepoch.set_description(f"Epoch {epoch+1}")
 
                 # Get img tensors from batch
-                img_tensor = batch[:, 0].to(config.device, dtype=torch.float32)
+                img_tensor = batch[1].to(config.device, dtype=torch.float32)
 
                 # Get captions
-                captions = batch[:, 1]
+                tokens = torch.stack(batch[0], dim=1)
 
-                # Build tokenizer
-                tokenizer = Tokenizer(config)
 
                 # Create t for each image in batch for the following forward diffusion operation
                 t = torch.randint(0, config.T, (config.batch_size,)).long().to(config.device)
 
                 # Make forward diffusion and get added noise and noised_images
-                noised_img, noise = forward_diffusion(img_tensor, t)
+                noised_img, noise = forward_diffusion(config, img_tensor, t)
+
+                noised_img.to(config.device)
 
                 # Model output
-                predicted_noise = model(noised_img, captions, t, tokenizer, config.do_cfg)
+                predicted_noise = model(noised_img, tokens, t, config.do_cfg)
 
                 # Get loss
                 loss = criterion(noise, predicted_noise)
 
                 # Neptune tracking
-                ### TODO
+                run["loss"].append(loss.item())
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                break
 
         # Evaluation
         if config.to_eval: 
             model.eval()
-            generated_img = get_sample(config, model, eval_caption)
+            generated_img = get_sample(config, model, config.eval_caption, n_imgs=1)[0]
+
+            run["inference"].upload(generated_img)
 
         # Model saving
         if config.saving_strategy == 'all':
             save_weights(config, model, optimizer, optimizer['lr'], epoch)
 
-
-    
 
 if __name__ == '__main__':
 
@@ -178,8 +195,7 @@ if __name__ == '__main__':
     criterion = torch.nn.SmoothL1Loss()
 
     # Get dataloader
-    ### TODO
-    dataloader = []
+    dataloader = get_dataloader(config)
 
     # Train the model
     train_model(config, model, optimizer, criterion, dataloader)

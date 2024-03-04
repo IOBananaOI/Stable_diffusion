@@ -3,8 +3,9 @@ import json
 import numpy as np
 
 import torch
-from torch import nn
 from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+from .tokenizer import Tokenizer
 
 from torchvision.transforms import ToTensor, Compose, Resize
 
@@ -21,6 +22,7 @@ class SD_Dataset(Dataset):
         self.img_path = config.img_path
         self.images = captions_json['images']
         self.captions = np.array(captions_json['annotations'])
+        self.tokenizer = Tokenizer(config)
 
         self.transformation = Compose([Resize((256, 256)), ToTensor()])
 
@@ -37,10 +39,8 @@ class SD_Dataset(Dataset):
 
         if founded_captions:
             caption = founded_captions[0]['caption']
-            captioned = True
         else:
-            caption =  [""]
-            captioned = False
+            caption =  ""
 
         # Get image
         file_name = self.images[ind]['file_name']
@@ -49,7 +49,9 @@ class SD_Dataset(Dataset):
         # Apply transformation
         img = self.transformation(img)
 
-        return caption, img
+        tokens = self.tokenizer.encode(caption)
+
+        return tokens, img
         
 
 def get_dataloader(config : StableDiffusionConfig):

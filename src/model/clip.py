@@ -18,6 +18,8 @@ class CLIPEmbedding(nn.Module):
         x = self.token_embedding(tokens)
 
         # (batch_size, seq_len, emb_dim) -> (batch_size, seq_len, emb_dim)
+        print(x.shape, self.positional_embedding.shape)
+
         x += self.positional_embedding
 
         return x
@@ -73,7 +75,7 @@ class CLIPEncoder(nn.Module):
 
     
     def forward(self, tokens : torch.Tensor):
-        tokens = tokens.type(torch.long)
+        tokens = tokens.type(torch.long).to('cuda')
 
         # (batch_size, seq_len) -> (batch_size, seq_len, emb_dim)
         emb = self.embedding_layer(tokens)

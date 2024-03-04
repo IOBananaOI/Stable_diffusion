@@ -29,7 +29,7 @@ class UNet_TimeEmbedding(nn.Module):
 class UNet_ResidualBlock(nn.Module):
     def __init__(self, in_features : int, out_features : int, time_dim : int) -> None:
         super().__init__()
-
+        print(in_features)
         self.norm_1 = nn.GroupNorm(32, in_features)
         self.conv_features = nn.Conv2d(in_features, out_features, kernel_size=3, padding=1)
         self.time_linear_layer = nn.Linear(time_dim, out_features)
@@ -247,15 +247,15 @@ class UNet(nn.Module):
             ### BLOCK 1
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim)
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim)
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim), 
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim), 
                 Upsample(unet_features_dims[2])
                 ),
 
@@ -327,15 +327,14 @@ class UNet(nn.Module):
         for layer in self.encoder:
             x = layer(x, context, time)
 
-        print(x.shape)
-
         # Bottleneck
         x = self.bottleneck(x, context, time)
-        print(x.shape)
 
+        
         # Decoder part
         for layer in self.decoder:
             x = layer(x, context, time)
+            print('Decoder')
 
         
         # Output layer

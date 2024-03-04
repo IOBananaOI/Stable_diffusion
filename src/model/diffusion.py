@@ -59,8 +59,10 @@ class StableDiffusion(nn.Module):
 
 
     def get_time_embedding(self, timestep : int):
-        freqs = torch.pow(10000, -torch.arange(start=0, end=160, dtype=torch.float32) / 160)
-        x = torch.tensor([timestep], dtype=torch.float32)[:, None] * freqs[None]
+
+        print(timestep)
+        freqs = torch.pow(10000, -torch.arange(start=0, end=160, dtype=torch.float32) / 160).to('cuda')
+        x = timestep[:, None] * freqs[None]
         x = torch.cat([torch.cos(x), torch.sin(x)], dim=-1).to(self.device)
         return x   
 
@@ -68,9 +70,8 @@ class StableDiffusion(nn.Module):
     def forward(
             self, 
             img : torch.Tensor, 
-            caption : torch.Tensor, 
+            tokens : torch.Tensor, 
             time : torch.Tensor,
-            tokenizer : Tokenizer,
             do_cfg=True
             ):
 
@@ -84,22 +85,17 @@ class StableDiffusion(nn.Module):
 
         if do_cfg:
             # Tokenize the prompt
-            cond_tokens = tokenizer.encode_batch(caption)
+            cond_tokens = tokens
             cond_tokens = torch.tensor(cond_tokens, dtype=torch.long, device=self.device)
             cond_context = self.clip(cond_tokens)
 
             # Handling uncond_prompt
-            uncond_prompt = uncond_prompt or [""] * len(caption)
-            uncond_tokens = tokenizer.encode_batch(uncond_prompt)
-            uncond_tokens = torch.tensor(uncond_tokens, dtype=torch.long, device=self.device)
+            uncond_prompt = [""] * len(tokens)
+            uncond_tokens = torch.tensor(uncond_prompt, dtype=torch.long, device=self.device)
             uncond_context = self.clip(uncond_tokens)
 
-            context = torch.cat([cond_context, uncond_context])
-
-        else:
-            tokens = tokenizer.encode_batch(caption)
-            tokens = torch.tensor(tokens, dtype=torch.long, device=self.device)
-
+            tokens = torch.cat([cond_context, uncond_context])
+            
         context = self.clip(tokens)
 
         # UNET
@@ -109,7 +105,7 @@ class StableDiffusion(nn.Module):
             # (batch_size, vae_latent_dim, latent_img_size, latent_img_size) -> # (2 * batch_size, vae_latent_dim, latent_img_size, latent_img_size)
             img = img.repeat(2, 1, 1, 1)
 
-        unet_output = self.unet(img, time, context)
+        unet_output = self.unet(img.to('cuda'), time, context)
 
         if do_cfg:
             output_cond, output_uncond = unet_output.chunk(2)
