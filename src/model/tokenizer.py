@@ -29,10 +29,10 @@ def pairwise(seq):
 
 class Tokenizer:
     def __init__(self, config : StableDiffusionConfig):
-        with open(config.tokenizer_vocab_path, encoding='utf-8') as f:
+        with open(config.tokenizer_vocab_path.resolve(), encoding='utf-8') as f:
             self.vocab = json.load(f)
 
-        with open(config.tokenizer_merges_path, encoding='utf-8') as f:
+        with open(config.tokenizer_merges_path.resolve(), encoding='utf-8') as f:
             lines = f.read().split('\n')
             lines = lines[1:-1]
             self.merges = {tuple(bigram.split()): i for i, bigram in enumerate(lines)}

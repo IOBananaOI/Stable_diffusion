@@ -24,6 +24,7 @@ class SD_Dataset(Dataset):
 
         self.transformation = Compose([Resize((256, 256)), ToTensor()])
 
+
     def __len__(self):
         return len(self.images)
 
@@ -36,8 +37,10 @@ class SD_Dataset(Dataset):
 
         if founded_captions:
             caption = founded_captions[0]['caption']
+            captioned = True
         else:
             caption =  [""]
+            captioned = False
 
         # Get image
         file_name = self.images[ind]['file_name']

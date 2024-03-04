@@ -46,8 +46,8 @@ class StableDiffusionConfig:
     captions_path = Path('data/captions/captions_train2017.json')
 
     # Tokenizer info
-    tokenizer_vocab_path = '../../data/vocab.json'
-    tokenizer_merges_path = '../../data/merges.txt'
+    tokenizer_vocab_path = Path('data/vocab.json')
+    tokenizer_merges_path = Path('data/merges.txt')
 
     # VAE info
     vae_features_dims = [128, 256, 512]

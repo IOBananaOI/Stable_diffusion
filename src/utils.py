@@ -1,10 +1,9 @@
 import sys
 sys.path.insert(0, 'model/')
 
-from typing import List, Literal
+from typing import List
 
 from model.config import StableDiffusionConfig
-from model.diffusion import StableDiffusion
 from model.tokenizer import Tokenizer
 
 from pathlib import Path
@@ -151,7 +150,7 @@ def forward_diffusion(config : StableDiffusionConfig, x0 : torch.Tensor, t):
 
 def remove_noise(
         config : StableDiffusionConfig, 
-        model : StableDiffusion, 
+        model, 
         t : torch.tensor, 
         noised_img : torch.tensor,
         caption : List[str],
@@ -193,7 +192,7 @@ def convert_tensor_to_image(image):
 
 
 @torch.no_grad()
-def get_sample(config : StableDiffusionConfig, model : StableDiffusion, caption, n_imgs=1):
+def get_sample(config : StableDiffusionConfig, model, caption, n_imgs=1):
     sample = []
 
     x_tm1 = torch.randn((1, config.img_channels, config.img_size, config.img_size), device=config.device, dtype=torch.float32)
