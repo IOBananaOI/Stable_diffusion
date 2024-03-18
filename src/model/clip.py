@@ -18,8 +18,6 @@ class CLIPEmbedding(nn.Module):
         x = self.token_embedding(tokens)
 
         # (batch_size, seq_len, emb_dim) -> (batch_size, seq_len, emb_dim)
-        print(x.shape, self.positional_embedding.shape)
-
         x += self.positional_embedding
 
         return x

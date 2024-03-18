@@ -157,18 +157,20 @@ def remove_noise(
         tokenizer : Tokenizer
     ):
     
-    betas_t = get_index(config.betas, t, noised_img.shape)
+    betas_t = get_index(config.betas, t, noised_img.shape, config.device)
 
-    sqrt_one_minus_alphas_cumprod_t = get_index(config.sqrt_one_minus_alphas_cumprod, t, noised_img.shape)
+    sqrt_one_minus_alphas_cumprod_t = get_index(config.sqrt_one_minus_alphas_cumprod, t, noised_img.shape, config.device)
     
-    sqrt_recip_alphas_t = get_index(config.sqrt_recip_alphas, t, noised_img.shape)
+    sqrt_recip_alphas_t = get_index(config.sqrt_recip_alphas, t, noised_img.shape, config.device)
 
-    model_output = model(noised_img, caption, t, tokenizer, config.do_cfg)
+    tokens = torch.tensor(tokenizer.encode(caption)).unsqueeze(0)
+
+    model_output = model(noised_img, tokens, t, config.do_cfg)
 
     model_mean = sqrt_recip_alphas_t * (
         noised_img - betas_t * model_output / sqrt_one_minus_alphas_cumprod_t
     )
-    posterior_variance_t = get_index(config.posterior_variance, t, noised_img.shape)
+    posterior_variance_t = get_index(config.posterior_variance, t, noised_img.shape, config.device)
 
     if t == 0:
         return model_mean
@@ -193,12 +195,12 @@ def convert_tensor_to_image(image):
 
 @torch.no_grad()
 def get_sample(config : StableDiffusionConfig, model, caption, n_imgs=1):
-    sample = []
+    sample = ['']
 
     x_tm1 = torch.randn((1, config.img_channels, config.img_size, config.img_size), device=config.device, dtype=torch.float32)
 
     for i in range(config.T-1, -1, -1):
-        x_tm1 = remove_noise(model, torch.tensor([i]).to(config.device), x_tm1).to(torch.float32)
+        x_tm1 = remove_noise(config, model, torch.tensor([i]).to(config.device), x_tm1, caption, Tokenizer(config)).to(torch.float32)
         x_tm1 = torch.clamp(x_tm1, -1.0, 1.0)
 
         if n_imgs == 'all':

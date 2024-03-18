@@ -59,8 +59,6 @@ class StableDiffusion(nn.Module):
 
 
     def get_time_embedding(self, timestep : int):
-
-        print(timestep)
         freqs = torch.pow(10000, -torch.arange(start=0, end=160, dtype=torch.float32) / 160).to('cuda')
         x = timestep[:, None] * freqs[None]
         x = torch.cat([torch.cos(x), torch.sin(x)], dim=-1).to(self.device)
@@ -82,28 +80,10 @@ class StableDiffusion(nn.Module):
         img = self.vae_enc(img, noise)
 
         # Context generation with CLIP
-
-        if do_cfg:
-            # Tokenize the prompt
-            cond_tokens = tokens
-            cond_tokens = torch.tensor(cond_tokens, dtype=torch.long, device=self.device)
-            cond_context = self.clip(cond_tokens)
-
-            # Handling uncond_prompt
-            uncond_prompt = [""] * len(tokens)
-            uncond_tokens = torch.tensor(uncond_prompt, dtype=torch.long, device=self.device)
-            uncond_context = self.clip(uncond_tokens)
-
-            tokens = torch.cat([cond_context, uncond_context])
-            
         context = self.clip(tokens)
 
         # UNET
         time = self.get_time_embedding(time)
-
-        if do_cfg:
-            # (batch_size, vae_latent_dim, latent_img_size, latent_img_size) -> # (2 * batch_size, vae_latent_dim, latent_img_size, latent_img_size)
-            img = img.repeat(2, 1, 1, 1)
 
         unet_output = self.unet(img.to('cuda'), time, context)
 

@@ -29,7 +29,6 @@ class UNet_TimeEmbedding(nn.Module):
 class UNet_ResidualBlock(nn.Module):
     def __init__(self, in_features : int, out_features : int, time_dim : int) -> None:
         super().__init__()
-        print(in_features)
         self.norm_1 = nn.GroupNorm(32, in_features)
         self.conv_features = nn.Conv2d(in_features, out_features, kernel_size=3, padding=1)
         self.time_linear_layer = nn.Linear(time_dim, out_features)
@@ -59,7 +58,7 @@ class UNet_ResidualBlock(nn.Module):
 
         time = self.time_linear_layer(time)
 
-        merged = x + time.unsqueeze(-1).unsqueeze(-1)
+        merged = x + time.squeeze(1).unsqueeze(-1).unsqueeze(-1)
 
         merged = self.norm_2(merged)
 
@@ -262,17 +261,17 @@ class UNet(nn.Module):
             ### BLOCK 2
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2] * 2, unet_features_dims[2], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1] * 3, unet_features_dims[2], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4),
                 Upsample(unet_features_dims[2])
                 ),
@@ -280,17 +279,17 @@ class UNet(nn.Module):
             ### BLOCK 3
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1] * 3, unet_features_dims[1], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1] * 2, unet_features_dims[1], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0] * 3, unet_features_dims[1], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2),
                 Upsample(unet_features_dims[1])
                 ),
@@ -298,17 +297,17 @@ class UNet(nn.Module):
             ### BLOCK 4
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0] * 3, unet_features_dims[0], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
-                UNet_AttentionBlock(num_heads, attn_dim * 2)
+                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0], time_emb_dim),
+                UNet_AttentionBlock(num_heads, attn_dim)
                 ),
 
             SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
+                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim)
                 ),
         ])
@@ -332,10 +331,8 @@ class UNet(nn.Module):
 
         
         # Decoder part
-        for layer in self.decoder:
+        for i, layer in enumerate(self.decoder):
             x = layer(x, context, time)
-            print('Decoder')
-
         
         # Output layer
         out = self.output_layer(x)

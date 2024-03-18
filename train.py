@@ -138,7 +138,6 @@ def train_model(
                 # Get captions
                 tokens = torch.stack(batch[0], dim=1)
 
-
                 # Create t for each image in batch for the following forward diffusion operation
                 t = torch.randint(0, config.T, (config.batch_size,)).long().to(config.device)
 
@@ -159,7 +158,6 @@ def train_model(
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                break
 
         # Evaluation
         if config.to_eval: 
