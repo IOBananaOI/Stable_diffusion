@@ -20,7 +20,7 @@ class SD_Dataset(Dataset):
         captions_json = json.load(open(config.captions_path.resolve()))
 
         self.img_path = config.img_path
-        self.images = captions_json['images']
+        self.images = captions_json['images'][:5000]
         self.captions = np.array(captions_json['annotations'])
         self.tokenizer = Tokenizer(config)
 

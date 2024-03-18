@@ -108,18 +108,18 @@ class CrossAttention(nn.Module):
 
     def forward(self, x : torch.Tensor, contenoised_img : torch.Tensor):
         input_shape = x.shape
-
         batch_size, seq_len, emb_dim = input_shape
 
         attn_shape = (batch_size, -1, self.num_heads, self.d_head)
+        k_shape = (contenoised_img.shape[0], -1, self.num_heads, self.d_head)
 
         q = self.Q(x)
         k = self.K(contenoised_img)
         v = self.V(contenoised_img)
 
         q = q.view(attn_shape).transpose(1, 2)
-        k = k.view(attn_shape).transpose(1, 2)
-        v = v.view(attn_shape).transpose(1, 2)
+        k = k.view(k_shape).transpose(1, 2)
+        v = v.view(k_shape).transpose(1, 2)
 
         weights = q @ k.transpose(-1, -2)
 

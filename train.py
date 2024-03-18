@@ -158,6 +158,7 @@ def train_model(
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                
 
         # Evaluation
         if config.to_eval: 
