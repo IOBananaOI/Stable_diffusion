@@ -32,7 +32,7 @@ def get_betas_from_alpha_bar(device, T, max_beta = 0.999, s = 0.08):
 class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    batch_size = 8
+    batch_size = 4
     num_epochs = 1
     lr = 1e-3
     preload = True
@@ -65,7 +65,7 @@ class StableDiffusionConfig:
     clip_seq_len = 30
     clip_emb_dim_scale_factor = 4
     clip_attn_num_heads = 12
-    clip_num_layers = 12
+    clip_num_layers = 6
     clip_dropout = 0.1
 
 

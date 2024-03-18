@@ -44,7 +44,7 @@ class SD_Dataset(Dataset):
 
         # Get image
         file_name = self.images[ind]['file_name']
-        img = Image.open(self.img_path.resolve() / file_name)
+        img = Image.open(self.img_path.resolve() / file_name).convert("RGB")
 
         # Apply transformation
         img = self.transformation(img)
