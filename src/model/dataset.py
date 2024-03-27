@@ -20,7 +20,7 @@ class SD_Dataset(Dataset):
         captions_json = json.load(open(config.captions_path.resolve()))
 
         self.img_path = config.img_path
-        self.images = captions_json['images'][:5000]
+        self.images = captions_json['images'][:4]
         self.captions = np.array(captions_json['annotations'])
         self.tokenizer = Tokenizer(config)
 
@@ -57,6 +57,6 @@ class SD_Dataset(Dataset):
 def get_dataloader(config : StableDiffusionConfig):
     dataset = SD_Dataset(config)
 
-    dataloader = DataLoader(dataset, config.batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, config.batch_size, shuffle=True, drop_last=True)
 
     return dataloader

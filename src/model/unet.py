@@ -186,11 +186,6 @@ class UNet(nn.Module):
                 UNet_AttentionBlock(num_heads, attn_dim)
             ),
 
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0], time_emb_dim), 
-                UNet_AttentionBlock(num_heads, attn_dim)
-            ),
-
             ### BLOCK 2
             # (batch_size, unet_features_dims[0], img_size // 8, img_size // 8) -> (batch_size, unet_features_dims[1], img_size // 16, img_size // 16)
 
@@ -198,11 +193,6 @@ class UNet(nn.Module):
             
             SwitchSequential(
                 UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[1], time_emb_dim), 
-                UNet_AttentionBlock(num_heads, attn_dim * 2)
-            ),
-
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1], time_emb_dim), 
                 UNet_AttentionBlock(num_heads, attn_dim * 2)
             ),
 
@@ -216,11 +206,6 @@ class UNet(nn.Module):
                 UNet_AttentionBlock(num_heads, attn_dim * 4)
             ),
 
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim), 
-                UNet_AttentionBlock(num_heads, attn_dim * 4)
-            ),
-
             ### BLOCK 4
             # (batch_size, unet_features_dims[2], img_size // 32, img_size // 32) -> (batch_size, unet_features_dims[2], img_size // 64, img_size // 64)
 
@@ -230,9 +215,6 @@ class UNet(nn.Module):
                 UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
             ),
 
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim)
-            )
             
         ])
 
@@ -267,11 +249,6 @@ class UNet(nn.Module):
 
             SwitchSequential(
                 UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim),
-                UNet_AttentionBlock(num_heads, attn_dim * 4)
-                ),
-
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[2], unet_features_dims[2], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 4),
                 Upsample(unet_features_dims[2])
                 ),
@@ -285,11 +262,6 @@ class UNet(nn.Module):
 
             SwitchSequential(
                 UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1], time_emb_dim),
-                UNet_AttentionBlock(num_heads, attn_dim * 2)
-                ),
-
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[1], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim * 2),
                 Upsample(unet_features_dims[1])
                 ),
@@ -298,11 +270,6 @@ class UNet(nn.Module):
 
             SwitchSequential(
                 UNet_ResidualBlock(unet_features_dims[1], unet_features_dims[0], time_emb_dim),
-                UNet_AttentionBlock(num_heads, attn_dim)
-                ),
-
-            SwitchSequential(
-                UNet_ResidualBlock(unet_features_dims[0], unet_features_dims[0], time_emb_dim),
                 UNet_AttentionBlock(num_heads, attn_dim)
                 ),
 

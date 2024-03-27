@@ -6,6 +6,7 @@ import argparse
 from tqdm import tqdm
 
 import neptune
+from neptune.types import File
 
 import torch
 from torch.optim import Optimizer, Adam
@@ -65,7 +66,7 @@ def load_weights(
     epoch = 0
 
     if config.weights_name is not None:
-        weights_folder = 'src/model/' + config.weights_folder
+        weights_folder = config.weights_folder
         weights_list = os.listdir(weights_folder)
 
         if config.weights_name == 'latest' and len(weights_list) > 0:
@@ -78,11 +79,12 @@ def load_weights(
         else:
             raise KeyError("No weights with the given name found.")
         
-        state_dict = torch.load(weights_folder + weights_name)
+        state_dict = torch.load(weights_folder / weights_name)
 
         model.load_state_dict(state_dict['model_state_dict'])
         optimizer.load_state_dict(state_dict['optimizer_state_dict'])
         epoch = state_dict['epoch']
+        print(f"Weights {weights_name} preloaded.")
     else:
         print("Model weights were not given.")
 
@@ -96,8 +98,9 @@ def save_weights(config : StableDiffusionConfig, model : StableDiffusion, optimi
         'lr' : lr,
         'epoch' : epoch
     }
+    savepath = config.weights_folder / (config.model_name + str(epoch) + '.pth')
 
-    torch.save(state_dict, config.weights_folder + config.model_name + str(epoch) + 'pth')
+    torch.save(state_dict, savepath)
 
 
 def train_model(
@@ -125,6 +128,8 @@ def train_model(
         "optimizer" : "Adam",
         "batch_size" : config.batch_size
     }
+
+    print("Parameters number: ", sum(p.numel() for p in model.parameters()))
     
     # Iterate over epochs from initial one
     for epoch in range(start_epoch, config.num_epochs):
@@ -165,11 +170,18 @@ def train_model(
             model.eval()
             generated_img = get_sample(config, model, config.eval_caption, n_imgs=1)[0]
 
-            run["inference"].upload(generated_img)
+            run["image_series"].append(
+                    File.as_image(generated_img),  
+                    name=f"Epoch {epoch}",
+                )
 
         # Model saving
-        if config.saving_strategy == 'all':
-            save_weights(config, model, optimizer, optimizer['lr'], epoch)
+    #     if config.saving_strategy == 'all':
+    #         save_weights(config, model, optimizer, config.lr, epoch)
+    
+
+    # if config.saving_strategy == 'last':
+    #     save_weights(config, model, optimizer, config.lr, epoch)
 
 
 if __name__ == '__main__':
@@ -186,9 +198,6 @@ if __name__ == '__main__':
 
     # Create optimizer instance
     optimizer = Adam(model.parameters(), lr=config.lr)
-
-    # Preloading previous weights for the following training
-    model, optimizer, start_epoch = load_weights(config, model, optimizer)
     
     # Define criterion
     criterion = torch.nn.SmoothL1Loss()

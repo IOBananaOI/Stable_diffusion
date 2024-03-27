@@ -33,7 +33,7 @@ class StableDiffusionConfig:
     # Training info
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     batch_size = 4
-    num_epochs = 20
+    num_epochs = 1
     lr = 1e-3
     preload = True
     to_eval = True
@@ -71,7 +71,7 @@ class StableDiffusionConfig:
 
     # UNet info
     unet_time_emb_dim = 320
-    unet_time_emb_dim_scale_factor = 4
+    unet_time_emb_dim_scale_factor = 2
     unet_features_dims = [320, 640, 1280]
     unet_attn_num_heads = 8
     unet_attn_dim = 40
@@ -97,7 +97,7 @@ class StableDiffusionConfig:
     neptune_run_id = None
 
     # Model saving
-    weights_folder = "weights/"
+    weights_folder = Path('src/model/weights/')
     model_name = "stable_diffusion_"
-    weights_name : str = None
-    saving_strategy = 1
+    weights_name : str = 'latest'
+    saving_strategy = 'last'
